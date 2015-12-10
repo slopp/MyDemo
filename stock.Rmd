@@ -1,0 +1,37 @@
+---
+output: html_document
+params:
+  symbol: AMZN
+---
+  
+## `r params$symbol`
+  
+```{r, echo=FALSE, message=FALSE}
+
+library(quantmod)
+library(dygraphs)
+
+
+prices <- round(getSymbols(params$symbol, auto.assign = FALSE), 2)
+close <- Cl(last(prices))
+open <- Op(last(prices))
+```
+
+The stock closed `r ifelse(close>open,'up','down')` at `r close` dollars per share yesterday.
+
+## Price History (htmlwidgets)
+
+The chart below is made with the `dygraphs', a great example of enbedding an htmlwidget.
+  
+```{r echo=FALSE}
+dygraphs::dygraph(prices, main=paste(params$symbol, "Price History")) %>% dygraphs::dyRangeSelector()
+```
+
+## Data
+
+This table displays the daily price data for the stock. 
+
+```{r echo=FALSE}
+DT::datatable(data.frame(prices[, 1:4], 2))
+```
+
