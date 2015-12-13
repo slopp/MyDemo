@@ -1,0 +1,121 @@
+---
+output: html_document
+---
+
+```{r, echo=FALSE, warning=FALSE}
+library(rvest)
+
+#----------------
+# Get Copper Mountain Snow Report
+#-----------------
+raw <- read_html("http://www.coppercolorado.com/winter/the_mountain/dom/snow.html")
+tbl <- raw %>% html_nodes("table")
+
+#Get Snow Report
+snw_rpt <- html_nodes(raw,css=".report-page-conditions+ .report-page-conditions p")
+snw_rpt <- html_text(snw_rpt[2])
+
+#-------------------
+# Get Snow Totals
+#-------------------
+snwfall <- raw %>% html_nodes("#report-page-conditions-snow td") %>% html_text()
+snwfall_new <- data.frame(key=snwfall[1], value=snwfall[2])
+snwfall <- data.frame(key=snwfall[3:8],value=snwfall[9:14])
+snwfall <- rbind(snwfall_new,snwfall)
+colnames(snwfall)<-c("Time Period","Snowfall in Inches")
+
+#---------------------
+# Check on Status of My Favorite Runs
+#----------------------
+runs <- raw %>% html_nodes(".odd+.even .title") %>% html_text()
+status <- raw %>% html_nodes(".odd+.even .status_icon img") %>% sapply(as.character)
+rating <- raw %>% html_nodes(".odd+.even .trail.icon img") %>% sapply(as.character)
+
+#define a simple parsing function
+get_img_name <- function(img_tag) {
+  result <- img_tag %>% dirname() %>% basename() %>% gsub(pattern='.gif\"', replacement="", x=.,fixed = TRUE)
+}
+
+status <- get_img_name(status)
+rating <- get_img_name(rating)
+
+run_data <- data.frame(run=runs,status=status,rating=rating)
+
+#-----------------------
+# Get SnoCountry Results
+#-----------------------
+url <- "http://feeds.snocountry.net/conditions.php?apiKey=SnoCountry.example&ids=303009"
+raw <- read_html(url)
+lvl1 <- raw %>% html_node("p") %>% html_text() %>% jsonlite::fromJSON()
+res <- lvl1$items
+
+# functions to capture data for plotting
+get_field <- function(day,field){
+  paste("weather",day,"_",field, sep="")
+}
+get_data_2_plot <- function(field){
+  f1 <- get_field("Today",field)
+  f2 <- get_field("Tomorrow",field)
+  f3 <- get_field("DayAfterTomorrow", field)
+  f4 <- get_field("Day4", field)
+  f5 <- get_field("Day5", field)
+  plt.data <- data.frame(res[f1],res[f2],res[f3],res[f4],res[f4])
+  colnames(plt.data)<-c("Today","Tomorrow","Day 3","Day 4","Day 5")
+  rownames(plt.data)<- c(field)
+  plt.data
+}
+
+#get weather data to plot
+fields <- c("Temperature_Low","Temperature_High","WindSpeed")
+plot.data <- t(do.call(rbind, lapply(fields, get_data_2_plot)))
+plot.data <- apply(plot.data, c(1,2), as.numeric)
+
+#get conditions
+tbl.data <- get_data_2_plot("Condition")
+
+#update weather data with date info
+d <- Sys.time()
+dates <- sapply(0:4,function(x) as.character(d+x*60*60*24))
+rownames(plot.data) <- dates
+
+```
+
+# Copper Mountain Report For `r weekdays(d)`
+
+
+## The Snow Report for Today is: 
+```{r, echo=FALSE} 
+DT::datatable(snwfall)
+```
+
+## Ski Patrol Says:
+
+`r snw_rpt`
+
+
+## Run Status for My Favorite Runs:
+
+```{r, echo=FALSE, warning=FALSE}
+my_runs <- c("Enchanted (U)", "Double Zero","Union Peak","17 Glade")
+my_runs <- data.frame(runs=my_runs)
+DT::datatable(dplyr::left_join(my_runs,run_data,by=c("runs"="run")))
+```
+
+## 5 Day Weather Forecast:
+
+```{r, echo=FALSE}
+library(dygraphs)
+dygraph(plot.data) %>% dyRangeSelector()
+```
+
+##With General Conditions:
+
+```{r, echo=FALSE}
+DT::datatable(tbl.data) 
+```
+
+## Status of All Runs:
+
+```{r echo=FALSE}
+DT::datatable(run_data)
+```
