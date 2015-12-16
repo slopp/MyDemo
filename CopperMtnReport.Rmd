@@ -2,9 +2,16 @@
 output: html_document
 ---
 
-```{r, echo=FALSE, warning=FALSE}
-library(rvest)
+```{r setup, warning=FALSE, message=FALSE, echo=FALSE}
+library(rvest) 
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
 
+```{r, echo=FALSE, message=FALSE}
 #----------------
 # Get Copper Mountain Snow Report
 #-----------------
@@ -88,18 +95,23 @@ rownames(plot.data) <- dates
 DT::datatable(snwfall)
 ```
 
+***
+
 ## Ski Patrol Says:
 
 `r snw_rpt`
 
+***
 
 ## Run Status for My Favorite Runs:
 
-```{r, echo=FALSE, warning=FALSE}
+```{r favorites, echo=FALSE, warning=FALSE, cache=FALSE}
 my_runs <- c("Enchanted (U)", "Double Zero","Union Peak","17 Glade")
 my_runs <- data.frame(runs=my_runs)
 DT::datatable(dplyr::left_join(my_runs,run_data,by=c("runs"="run")))
 ```
+
+***
 
 ## 5 Day Weather Forecast:
 
@@ -108,11 +120,15 @@ library(dygraphs)
 dygraph(plot.data) %>% dyRangeSelector()
 ```
 
+***
+
 ##With General Conditions:
 
 ```{r, echo=FALSE}
 DT::datatable(tbl.data) 
 ```
+
+***
 
 ## Status of All Runs:
 
