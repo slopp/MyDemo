@@ -51,7 +51,7 @@ ui <- dashboardPage(
 
 server <- function(input, output){
   carrier.data <- reactive({
-    print(input$carrier)
+    validate(need(input$carrier != "", "Please Select a Carrier"))
     carrier.code <- carriers %>% select(code) %>% filter(description == input$carrier)
     carrier.code <- collect(carrier.code)
     q <- flights %>% select(arrdelay) %>% filter(uniquecarrier == carrier.code$code)
