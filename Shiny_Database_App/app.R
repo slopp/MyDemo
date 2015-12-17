@@ -2,6 +2,7 @@ library(shiny)
 library(dplyr)
 library(ggplot2)
 library(shinydashboard)
+library(rpivotTable)
 
 #-----------------------
 # Connect to Database
@@ -29,22 +30,38 @@ carrier.names <-collect(carrier.names) %>% arrange(description)
 
 ui <- dashboardPage(
   dashboardHeader(title="Airline Delay Analysis"),
-  dashboardSidebar(disable=TRUE),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Explore Fields", tabName="explore"),
+      menuItem("Pivot Table", tabName="pivot")
+    ) 
+  ),
   dashboardBody(
-    fluidRow(
-      box(title="Inputs", status="warning",solidHeader = TRUE,
-          selectizeInput(inputId = "carrier",label="Select Carrier",choices=carrier.names)
+    tabItems(
+      tabItem(tabName="explore",
+        fluidRow(
+          box(title="Inputs", status="warning",solidHeader = TRUE,
+              selectizeInput(inputId = "carrier",label="Select Carrier",choices=carrier.names)
+          ),
+          
+          box(title="Results", status="primary", solidHeader = TRUE,
+              hr("Distribution of Delay Times"),
+              plotOutput("hist")
+          )
+          
+        ),
+        
+        fluidRow(
+          valueBox(nrow(carrier.names), "Total Carriers", icon=icon("info-sign", lib="glyphicon"), color="teal"),
+          infoBoxOutput("carrierflights")
+        )
       ),
       
-      box(title="Results", status="primary", solidHeader = TRUE,
-          hr("Distribution of Delay Times"),
-          plotOutput("hist")
-      )
       
-    ),
-    fluidRow(
-      valueBox(nrow(carrier.names), "Total Carriers", icon=icon("info-sign", lib="glyphicon"), color="teal"),
-      infoBoxOutput("carrierflights")
+      tabItem(tabName="pivot", 
+        rpivotTableOutput("pivot.table")
+        )
+      
     )
   )
 )
@@ -58,6 +75,12 @@ server <- function(input, output){
     collect(q)
   })
   
+  full.data <- function(){
+    print("loading")
+    full.data <- flights  %>% select(year,month,dayofweek,uniquecarrier,arrdelay,depdelay,distance,origin)
+    collect(full.data)
+  }
+  
   output$hist <- renderPlot({
     validate(need(dim(carrier.data())[1]>0, "No flight information for this carrier"))
     ggplot(data=carrier.data(), aes(arrdelay))+geom_histogram()+ggtitle(input$carrier)
@@ -66,6 +89,10 @@ server <- function(input, output){
   output$carrierflights <- renderValueBox({
     valueBox(
       dim(carrier.data())[1], paste("Total Flights for", input$carrier), color='teal')
+  })
+  
+  output$pivot.table <- renderRpivotTable({
+    rpivotTable(full.data())
   })
   
 }
