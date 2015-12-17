@@ -39,28 +39,29 @@ ui <- dashboardPage(
   dashboardBody(
     tabItems(
       tabItem(tabName="explore",
-        fluidRow(
-          box(title="Inputs", status="warning",solidHeader = TRUE,
-              selectizeInput(inputId = "carrier",label="Select Carrier",choices=carrier.names)
-          ),
-          
-          box(title="Results", status="primary", solidHeader = TRUE,
-              hr("Distribution of Delay Times"),
-              plotOutput("hist")
-          )
-          
-        ),
-        
-        fluidRow(
-          valueBox(nrow(carrier.names), "Total Carriers", icon=icon("info-sign", lib="glyphicon"), color="teal"),
-          infoBoxOutput("carrierflights")
-        )
+              fluidRow(
+                box(title="Inputs", status="warning",solidHeader = TRUE,
+                    selectizeInput(inputId = "carrier",label="Select Carrier",choices=carrier.names, selected="American Airlines Inc."),
+                    selectizeInput(inputId = "var",label="Select Variable",choices=colnames(flights), selected="arrdelay")
+                ),
+                
+                box(title="Results", status="primary", solidHeader = TRUE,
+                    hr("Distribution of Delay Times"),
+                    plotOutput("hist")
+                )
+                
+              ),
+              
+              fluidRow(
+                valueBox(nrow(carrier.names), "Total Carriers", icon=icon("info-sign", lib="glyphicon"), color="teal"),
+                infoBoxOutput("carrierflights")
+              )
       ),
       
       
       tabItem(tabName="pivot", 
-        rpivotTableOutput("pivot.table")
-        )
+              rpivotTableOutput("pivot.table")
+      )
       
     )
   )
@@ -69,9 +70,10 @@ ui <- dashboardPage(
 server <- function(input, output){
   carrier.data <- reactive({
     validate(need(input$carrier != "", "Please Select a Carrier"))
+    validate(need(input$var != "", "Please Select a Variable"))
     carrier.code <- carriers %>% select(code) %>% filter(description == input$carrier)
     carrier.code <- collect(carrier.code)
-    q <- flights %>% select(arrdelay) %>% filter(uniquecarrier == carrier.code$code)
+    q <- flights %>% select(which(colnames(flights)==input$var)) %>% filter(uniquecarrier == carrier.code$code)
     collect(q)
   })
   
@@ -83,7 +85,7 @@ server <- function(input, output){
   
   output$hist <- renderPlot({
     validate(need(dim(carrier.data())[1]>0, "No flight information for this carrier"))
-    ggplot(data=carrier.data(), aes(arrdelay))+geom_histogram()+ggtitle(input$carrier)
+    ggplot(data=carrier.data(), aes_string(input$var)) + geom_histogram() +ggtitle(paste(input$carrier, input$var))
   })
   
   output$carrierflights <- renderValueBox({
