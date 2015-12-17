@@ -1,0 +1,1 @@
+This application shows how to work with data that is stored in a database.In this case the database is a local instance of postgreSQL containing flight information.
