@@ -1,0 +1,64 @@
+---
+  output: html_document
+---
+  
+```{r setup, warning=FALSE, message=FALSE, echo=FALSE}
+library(rvest)
+library(dygraphs)
+library(DT)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+source('CopperMtnReport_PullData_NWS.R')
+```
+
+
+# Copper Mountain Report For `r weekdays(d)`
+
+
+## The Snow Report for Today is: 
+```{r snowReport, echo=FALSE} 
+datatable(snwfall)
+```
+
+***
+  
+## Ski Patrol Says:
+  
+`r snw_rpt`
+
+***
+  
+## Run Status for My Favorite Runs:
+  
+```{r favorites, echo=FALSE, warning=FALSE, cache=FALSE}
+my_runs <- c("Enchanted (U)", "Double Zero","Union Peak","17 Glade")
+my_runs <- data.frame(runs=my_runs)
+datatable(dplyr::left_join(my_runs,run_data,by=c("runs"="run")))
+```
+
+***
+  
+## 5 Day Weather Forecast:
+  
+```{r weatherForecast, echo=FALSE, fig.height=3.5}
+dygraph(plot.data) %>% dyRangeSelector()
+```
+
+***
+  
+##With General Conditions:
+  
+```{r generalConditions, echo=FALSE}
+datatable(tbl.data) 
+```
+
+***
+  
+## Status of All Runs:
+  
+```{r allRuns, echo=FALSE}
+datatable(run_data)
+```
