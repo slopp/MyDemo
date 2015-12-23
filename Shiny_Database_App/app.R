@@ -33,6 +33,9 @@ cities <- collect(cities)
 # Shiny Dashboard
 #-----------------------
 
+#---------
+# UI
+#---------
 ui <- dashboardPage(
   dashboardHeader(title="Airline Delay Analysis"),
   dashboardSidebar(
@@ -43,6 +46,7 @@ ui <- dashboardPage(
     ) 
   ),
   dashboardBody(
+    #--- Explore Pane
     tabItems(
       tabItem(tabName="explore",
               fluidRow(
@@ -64,26 +68,27 @@ ui <- dashboardPage(
               )
       ),
       
-      
+      #--- Pivot Tabel Pane
       tabItem(tabName="pivot", 
-              rpivotTableOutput("pivot.table")
+            rpivotTableOutput("pivot")
       ),
       
+      #--- Model Pane
       tabItem(tabName = "model",
             fluidRow(
-              box(title = "Select City", status = "warning",solidHeader = TRUE,
-                 selectizeInput(inputId = "city", label="Select Departure City", choices=cities)
+              box(title = "Model Delay", status = "warning",solidHeader = TRUE,
+                 selectizeInput(inputId = "mtype", label="Arrival or Departure", choices=c('arrdelay','depdelay'))
               ),
               box(title="Model Description",status="info",solidHeader = TRUE,
-                  p('A linear model will be built to predict arrival delay by airline while accounting for the other variables.'),
+                  p('A simple linear model will be fit (for the sake of time). In reality, a zero-inflated gamma model would be more appropriate.'),
                   actionButton(inputId = "runModel", label = "Run Model")
               )
             ),
             
             fluidRow(
               box(title = "Results", status = "success", solidHeader=TRUE,width = 12,
-                  verbatimTextOutput("modelDetails"),
-                  plotOutput("delayByAirline")
+                  plotOutput("delayByAirline"),
+                  verbatimTextOutput("modelDetails")
                   
               )
             )
@@ -93,7 +98,15 @@ ui <- dashboardPage(
   )
 )
 
+#--------
+# Server
+#---------
 server <- function(input, output){
+  
+  
+  #------------- Explore Tab
+  
+  # gets data by carrier for the explore pane
   carrier.data <- reactive({
     validate(need(input$carrier != "", "Pleasedplyr::select a Carrier"))
     validate(need(input$var != "", "Pleasedplyr::select a Variable"))
@@ -103,35 +116,43 @@ server <- function(input, output){
     collect(q)
   })
   
-  full.data <- function(){
-    print("loading")
-    full.data <- flights  %>%dplyr::select(year,month,dayofweek,uniquecarrier,arrdelay,depdelay,distance,origin)
-    collect(full.data)
-  }
-  
+  # histogram (for the explore pane)
   output$hist <- renderPlot({
     validate(need(dim(carrier.data())[1]>0, "No flight information for this carrier"))
     ggplot(data=carrier.data(), aes_string(input$var)) + geom_histogram() +ggtitle(paste(input$carrier, input$var))
   })
   
+  # value box (lists # of data points in the explore pane)
   output$carrierflights <- renderValueBox({
     valueBox(
       dim(carrier.data())[1], paste("Total Flights for", input$carrier), color='teal')
   })
   
-  output$pivot.table <- renderRpivotTable({
-    rpivotTable(full.data())
+  #--------------- Pivot Table
+  
+  # gets all data (for the rpivotTable)
+  full.data <- function(){
+    
+    full.data <- flights%>%dplyr::select(year,month,dayofweek,uniquecarrier,arrdelay,depdelay,distance,origin)
+    full.data <- as.data.frame(collect(full.data))
+
+  }
+  
+  output$pivot <- renderRpivotTable({
+    progress <- shiny::Progress$new()
+    progress$set(message ="Fetching Data", value=0.2)
+    on.exit(progress$close())
+    
+    rpivotTable(full.data(), width="100%", height="500px")
+    
   })
   
-  run.model <- eventReactive(input$runModel, {
-    city.data <- flights %>%dplyr::select(everything()) %>% filter(arrdelay>=0) %>% filter(!is.na(arrdelay)) # %>% filter(origin == input$city)
-    city.data <- collect(city.data)
-    m <- zeroinfl(data=city.data, arrdelay ~ uniquecarrier + factor(dayofweek) + distance | 1)
-     
-  })
   
+  #---------------- Model Table
+  
+  # supporting function to parse out coefficients
   parse.model <- function(m){
-    coef <- as.data.frame(m$coefficients$count)
+    coef <- as.data.frame(m$coefficients)
     coef <- cbind(coef, rownames(coef)) 
     colnames(coef)<- c("coefficient","airline")
     coef<-mutate(coef, carrier=grepl(pattern = "unique",coef$airline))
@@ -142,13 +163,40 @@ server <- function(input, output){
     coef<- coef %>% dplyr::select(description, coefficient) %>% arrange(coefficient)
   }
   
+  
+  # reactive event that changes when the model is run
+  run.model <- eventReactive(input$runModel, {
+    if(input$mtype == "arrdelay"){
+      delay.data <- flights %>%dplyr::select(everything()) %>% filter(arrdelay>=0) %>% filter(!is.na(arrdelay))
+      delay.data <- collect(delay.data)
+      m <- lm(data=delay.data, arrdelay ~ uniquecarrier + factor(dayofweek) + deptime + distance -1)
+    }
+    
+    if(input$mtype == "depdelay"){
+      delay.data <- flights %>%dplyr::select(everything()) %>% filter(depdelay>=0) %>% filter(!is.na(depdelay))
+      delay.data <- collect(delay.data)
+      m <- lm(data=delay.data, depdelay ~ uniquecarrier + factor(dayofweek) + deptime-1)
+    }
+    
+    the.coefs <- parse.model(m)
+    the.coefs$description <- strtrim(the.coefs$description,30)
+    the.coefs$classify <- ifelse(the.coefs$coefficient >0, "greater delay","less delay")
+    
+    the.call  <- as.character(m$call)
+    the.call <- paste(the.call[1],"(", the.call[2],")")
+    results <- list(the.coefs, the.call)
+  })
+  
+  
   output$modelDetails <- renderText({
-    m <- run.model()
-    as.character(m$call)
+    results <- run.model()
+    results[[2]]
   })
   
   output$delayByAirline <- renderPlot({
-    ggplot(t, aes(x=description, y=coefficient))+ geom_bar(stat="identity") + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) + xlab("Airline")
+    the.results <- run.model()
+    the.coef <- the.results[[1]]
+    ggplot(the.coef, aes(x=description, y=coefficient, fill=classify))+ geom_bar(stat="identity") + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) + xlab("Airline")
 
   })
 }
