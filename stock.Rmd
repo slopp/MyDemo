@@ -1,12 +1,12 @@
 ---
 output: html_document
 params:
-  symbol: AMZN
+  symbol: IBM
 ---
   
 ## `r params$symbol`
   
-```{r, echo=FALSE, message=FALSE}
+```{r get_data, echo=FALSE, message=FALSE}
 
 library(quantmod)
 library(dygraphs)
@@ -23,7 +23,7 @@ The stock closed `r ifelse(close>open,'up','down')` at `r close` dollars per sha
 
 The chart below is made with the `dygraphs', a great example of enbedding an htmlwidget.
   
-```{r echo=FALSE}
+```{r plot_timeseries, echo=FALSE}
 dygraphs::dygraph(prices, main=paste(params$symbol, "Price History")) %>% dygraphs::dyRangeSelector()
 ```
 
@@ -31,7 +31,7 @@ dygraphs::dygraph(prices, main=paste(params$symbol, "Price History")) %>% dygrap
 
 This table displays the daily price data for the stock. 
 
-```{r echo=FALSE}
+```{r create_dataTable, echo=FALSE}
 DT::datatable(data.frame(prices[, 1:4], 2))
 ```
 
