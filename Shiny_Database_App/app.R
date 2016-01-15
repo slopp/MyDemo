@@ -1,7 +1,6 @@
 library(shiny)
 library(dplyr)
 library(dplyr)
-library(pscl)
 library(ggplot2)
 library(shinydashboard)
 library(rpivotTable)
@@ -63,7 +62,7 @@ ui <- dashboardPage(
               ),
               
               fluidRow(
-                valueBox(nrow(carrier.names), "Total Carriers", icon=icon("info-sign", lib="glyphicon"), color="teal"),
+                valueBox(nrow(carrier.names), "Total Carriers", icon=icon("info-sign", lib="glyphicon"), color="red"),
                 infoBoxOutput("carrierflights")
               )
       ),
@@ -108,8 +107,8 @@ server <- function(input, output){
   
   # gets data by carrier for the explore pane
   carrier.data <- reactive({
-    validate(need(input$carrier != "", "Pleasedplyr::select a Carrier"))
-    validate(need(input$var != "", "Pleasedplyr::select a Variable"))
+    validate(need(input$carrier != "", "Please select a Carrier"))
+    validate(need(input$var != "", "Pleased select a Variable"))
     carrier.code <- carriers %>%dplyr::select(code) %>% filter(description == input$carrier)
     carrier.code <- collect(carrier.code)
     q <- flights %>%dplyr::select(which(colnames(flights)==input$var)) %>% filter(uniquecarrier == carrier.code$code)
@@ -123,12 +122,12 @@ server <- function(input, output){
   })
   
   # value box (lists # of data points in the explore pane)
-  output$carrierflights <- renderValueBox({
-    valueBox(
+  output$carrierflights <- renderInfoBox({
+    infoBox(
       dim(carrier.data())[1], paste("Total Flights for", input$carrier), color='teal')
   })
   
-  #--------------- Pivot Table
+  #--------------- Pivot Table Tab
   
   # gets all data (for the rpivotTable)
   full.data <- function(){
@@ -148,7 +147,7 @@ server <- function(input, output){
   })
   
   
-  #---------------- Model Table
+  #---------------- Model Tab
   
   # supporting function to parse out coefficients
   parse.model <- function(m){
