@@ -1,21 +1,24 @@
 ---
 output: html_document
 params:
-  symbol: IBM
+  symbol: AMZN
 ---
   
 ## `r params$symbol`
   
-```{r get_data, echo=FALSE, message=FALSE}
+```{r get_data, echo=FALSE, message=FALSE, warnings=FALSE}
 
 library(quantmod)
 library(dygraphs)
+library(DT)
 
 
 prices <- round(getSymbols(params$symbol, auto.assign = FALSE), 2)
 close <- Cl(last(prices))
 open <- Op(last(prices))
 ```
+
+
 
 The stock closed `r ifelse(close>open,'up','down')` at `r close` dollars per share yesterday.
 
@@ -29,7 +32,7 @@ dygraphs::dygraph(prices, main=paste(params$symbol, "Price History")) %>% dygrap
 
 ## Data
 
-This table displays the daily price data for the stock. 
+This table displays the daily price data for the stock, the htmlwidget 'DT' is required.
 
 ```{r create_dataTable, echo=FALSE}
 DT::datatable(data.frame(prices[, 1:4], 2))
