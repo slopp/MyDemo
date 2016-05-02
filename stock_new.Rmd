@@ -1,0 +1,63 @@
+---
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+params:
+  symbol: TSLA
+---
+  
+# `r params$symbol` 
+
+## Summary{.tabset}
+
+```{r, echo=FALSE, message=FALSE}
+
+library(quantmod)
+library(dygraphs)
+
+prices <- round(getSymbols(params$symbol, auto.assign = FALSE), 2)
+close <- Cl(last(prices))
+open <- Op(last(prices))
+```
+
+The stock closed `r ifelse(close>open,'up','down')` at `r close` dollars per share yesterday.
+
+### Price History
+
+The chart below is made with the `quantmod` and `dygraphs` R packages.
+***
+  
+```{r echo=FALSE}
+dygraphs::dygraph(prices) %>% dyRangeSelector()
+```
+
+### Raw Data
+
+The table below displays the daily price data for the stock. We made a concise, interactive table with the `DT` package, a new package for making searchable data tables. 
+***
+  
+```{r echo=TRUE}
+DT::datatable(data.frame(prices[, 1:4], 2))
+```
+
+## Model{.tabset}
+
+### Plot
+
+This model is fit with the auto.arima function in the forecast package.
+
+```{r, warning=FALSE, message=FALSE}
+library(forecast)
+m <- auto.arima(prices[,1])
+plot(forecast(m,12))
+```
+
+### Forecasts
+```{r, warning=FALSE, message=FALSE}
+f <- forecast(m,12)
+```
+
+The forecast for tomorrow is `r as.numeric(f$mean)[1]`.
+
